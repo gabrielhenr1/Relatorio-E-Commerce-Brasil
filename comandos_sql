@@ -1,0 +1,181 @@
+
+Clientes
+
+Create Table Clientes(
+	id_unico_cliente serial primary key,
+	id_cliente_pedido varchar(30),
+	cep varchar(10),
+	cidade varchar(30),
+	estado varchar(30)
+);
+
+Pedidos
+
+CREATE TABLE pedidos (
+    idpedido VARCHAR(50) PRIMARY KEY, -- Aqui você insere o hash 'e481f5...' direto
+    idclientepedido VARCHAR(50),
+    status VARCHAR(20),
+    data_compra TIMESTAMP,
+    data_aprovacao TIMESTAMP,
+    data_postagem TIMESTAMP,
+    data_entrega TIMESTAMP,
+    data_prevista TIMESTAMP
+);
+
+Itens do Pedido
+
+CREATE TABLE Itens_Pedido (
+    id_item_interno SERIAL PRIMARY KEY,
+    id_pedido VARCHAR(50),
+    id_ordem_pedido INT,
+    id_produto VARCHAR(50),
+    id_vendedor VARCHAR(50),
+    data_limite TIMESTAMP,
+    preco DECIMAL(10,2),
+    valor_frete DECIMAL(10,2)
+);
+
+
+Pagamento
+
+create table Pagamentos (
+	idpagamento serial primary key,
+	id_pedido varchar(50),
+	pagamento_ordem int,
+	tipo_pagamento varchar(20),
+	parcelas_pagamento int,
+	valor_pagamento decimal(10,2)
+);
+
+Produtos
+
+CREATE TABLE produtos (
+    id_interno_produto SERIAL PRIMARY KEY,
+    id_produto_hash VARCHAR(50),
+    categoria_nome VARCHAR(100),
+    desc_tamanho INT,
+    fotos_qtd INT,
+    peso_g INT,
+    comprimento_cm INT,
+    altura_cm INT,
+    largura_cm INT
+);
+
+Avaliação
+
+CREATE TABLE avaliacoes (
+    idinternoavaliacao SERIAL PRIMARY KEY,
+    idavaliacao VARCHAR(50),
+    id_pedido VARCHAR(50),
+    nota INT,
+    titulo_comentario VARCHAR(100),
+    mensagem_comentario TEXT,
+    data_criacao TIMESTAMP,
+    data_resposta TIMESTAMP
+);
+
+Vendedores
+
+create table Vendedores(
+	idinternovedendor serial primary key,
+	idvendedor varchar(50),
+	cep_vendedor varchar(10),
+	cidade varchar(100),
+	estado char(2)
+);
+
+Localizacao
+
+create table Localizacao (
+	idlocalizacao serial primary key,
+	cep varchar(10),
+	latitude double precision,
+	longitude double precision,
+	cidade varchar(100),
+	estado char(2)
+);
+
+
+-- 1. CLIENTES
+COPY "Clientes"(id_cliente_pedido, id_unico_cliente, cep, cidade, estado)
+FROM 'C:/Users/gabri/OneDrive/Desktop/SQL/E-Commerce Brasil/archive/olist_customers_dataset.csv'
+WITH (FORMAT csv, HEADER true, DELIMITER ',');
+
+-- 2. PEDIDOS
+COPY pedidos(idpedido, idclientepedido, status, data_compra, data_aprovacao, data_postagem, data_entrega, data_prevista)
+FROM 'C:/Users/gabri/OneDrive/Desktop/SQL/E-Commerce Brasil/archive/olist_orders_dataset.csv'
+WITH (FORMAT csv, HEADER true, DELIMITER ',');
+
+-- 3. ITENS DO PEDIDO (Pulando o SERIAL id_item_interno)
+COPY "Itens_Pedido"(id_pedido, id_ordem_pedido, id_produto, id_vendedor, data_limite, preco, valor_frete)
+FROM 'C:/Users/gabri/OneDrive/Desktop/SQL/E-Commerce Brasil/archive/olist_order_items_dataset.csv'
+WITH (FORMAT csv, HEADER true, DELIMITER ',');
+
+-- 4. PAGAMENTOS (Pulando o SERIAL idpagamento)
+COPY "Pagamentos"(id_pedido, pagamento_ordem, tipo_pagamento, parcelas_pagamento, valor_pagamento)
+FROM 'C:/Users/gabri/OneDrive/Desktop/SQL/E-Commerce Brasil/archive/olist_order_payments_dataset.csv'
+WITH (FORMAT csv, HEADER true, DELIMITER ',');
+
+-- 5. PRODUTOS (Pulando o SERIAL idprodutointerno)
+-- Nota: O CSV de produtos tem mais colunas, aqui mapeamos as principais que você criou
+COPY "Produtos"(idproduto, produto_category, produto_peso, produto_dimensao)
+FROM 'C:/Users/gabri/OneDrive/Desktop/SQL/E-Commerce Brasil/archive/olist_products_dataset.csv'
+WITH (FORMAT csv, HEADER true, DELIMITER ',');
+
+-- 6. AVALIAÇÕES (Pulando o SERIAL idinterno)
+COPY "Avaliacoes"(idavaliacao, id_pedido, nota, mensagem_avaliacao)
+FROM 'C:/Users/gabri/OneDrive/Desktop/SQL/E-Commerce Brasil/archive/olist_order_reviews_dataset.csv'
+WITH (FORMAT csv, HEADER true, DELIMITER ',');
+
+-- 7. VENDEDORES (Pulando o SERIAL idinternovedendor)
+COPY "Vendedores"(idvendedor, cep_vendedor, cidade, estado)
+FROM 'C:/Users/gabri/OneDrive/Desktop/SQL/E-Commerce Brasil/archive/olist_sellers_dataset.csv'
+WITH (FORMAT csv, HEADER true, DELIMITER ',');
+
+-- 8. LOCALIZAÇÃO (Pulando o SERIAL idlocalizacao)
+COPY "Localizacao"(cep, latitude, longitude, cidade, estado)
+FROM 'C:/Users/gabri/OneDrive/Desktop/SQL/E-Commerce Brasil/archive/olist_geolocation_dataset.csv'
+WITH (FORMAT csv, HEADER true, DELIMITER ',');
+
+
+
+
+QUERY RFM
+create table rfm_notas as
+with metricas as(
+	select c.idunicocliente as cliente,
+	sum(valor_pagamento) as valor_total,
+	count(idpedido) as quantidade_compras,
+	date_part('day', (select max(data_compra) from pedidos) - max(data_compra)) as ultima_compra
+	from clientes c
+	inner join pedidos p 
+	on c.id_cliente_pedido = p.idclientepedido
+	inner join pagamentos pag
+	on pag.id_pedido = p.idpedido
+	group by c.idunicocliente
+),
+rfm_notas as(
+	select *,
+	ntile(5) over (order by valor_total asc) as m_nota,
+	ntile(5) over (order by ultima_compra desc) as r_nota,
+	case
+	when quantidade_compras >= 3 then 5
+	when quantidade_compras = 2 then 2
+	else 1
+	end as f_nota
+	from metricas
+)
+select *, 
+	case
+		when r_nota >= 4 and f_nota >= 4 then 'Campeões'
+		when r_nota >= 3 and f_nota >= 3 then 'Clientes Fiéis'
+		when r_nota >= 4 and f_nota = 1 then 'Novos Clientes'
+		when r_nota <= 2 and f_nota >= 3 then 'Clientes em Risco'
+		when r_nota = 1 then 'Perdidos / Adormecidos'
+		else 'Promissores'
+	end as Segmento
+	from rfm_notas;
+
+
+
+
