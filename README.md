@@ -22,4 +22,4 @@ Os dados utilizados foram extraídos de um dataset público da **Olist** dispon�
 
 ## 📸 Visualização do Dashboard
 
-![Dashboard] (C:\Users\gabri\OneDrive\Pictures\Screenshots\dashboard_ecommerce.png)
+<img width="1003" height="566" alt="Image" src="https://github.com/user-attachments/assets/2108d7cd-15e1-43c9-bac8-84def33f5fa9" />
